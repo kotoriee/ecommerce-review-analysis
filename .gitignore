@@ -22,6 +22,7 @@ ENV/
 # Data files (too large)
 *.csv
 data/raw/*.json
+data/raw/**/._____temp/
 data/processed/*.jsonl
 models/*/checkpoint-*/
 *.safetensors
