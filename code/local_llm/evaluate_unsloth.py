@@ -38,8 +38,7 @@ Output format: {{"sentiment": X, "confidence": Y.YZ, "rationale": "explanation"}
 <|im_start|>user
 Review: {review_text}<|im_end|>
 <|im_start|>assistant
-<thinking>
-"""
+<think>
 
 
 def extract_sentiment(text: str) -> int:
@@ -185,12 +184,20 @@ def main():
     # 评估准确率
     correct = 0
     valid = 0
+    # 分类统计
+    class_correct = {0: 0, 1: 0, 2: 0}
+    class_total = {0: 0, 1: 0, 2: 0}
+    confusion = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]  # true x pred
+
     for true, pred_text in zip(true_labels, all_preds):
         pred = extract_sentiment(pred_text)
         if pred != -1:
             valid += 1
+            class_total[true] += 1
+            confusion[true][pred] += 1
             if pred == true:
                 correct += 1
+                class_correct[true] += 1
 
     accuracy = correct / valid * 100 if valid > 0 else 0
 
@@ -202,6 +209,24 @@ def main():
     print(f"正确: {correct}")
     print(f"准确率: {accuracy:.2f}%")
     print(f"推理速度: {speed:.2f} 条/秒")
+
+    # 类别分布
+    print(f"\n{'='*60}")
+    print(f"类别分布与准确率")
+    print(f"{'='*60}")
+    label_names = {0: "负面(0)", 1: "中性(1)", 2: "正面(2)"}
+    for label in [0, 1, 2]:
+        acc = class_correct[label] / class_total[label] * 100 if class_total[label] > 0 else 0
+        print(f"{label_names[label]}: 总数={class_total[label]}, 正确={class_correct[label]}, 准确率={acc:.1f}%")
+
+    # 混淆矩阵
+    print(f"\n{'='*60}")
+    print(f"混淆矩阵 (真实 x 预测)")
+    print(f"{'='*60}")
+    print("          预:0    预:1    预:2")
+    for true_label in [0, 1, 2]:
+        row = confusion[true_label]
+        print(f"真:{true_label}     {row[0]:4d}    {row[1]:4d}    {row[2]:4d}")
 
     # 显示示例
     print(f"\n预测示例:")
