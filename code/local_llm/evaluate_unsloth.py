@@ -71,41 +71,71 @@ def extract_sentiment(text: str) -> int:
 
 
 def main():
+    import argparse
     from unsloth import FastLanguageModel
 
-    model_path = "models/qwen3-4b-sentiment-lora_merged_16bit"
-    data_path = "data/processed/test.json"
-    max_samples = 1000  # 评估1000条
-    max_new_tokens = 60
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", type=str, default="models/curriculum/lora_s1_600",
+                        help="Path to LoRA adapters")
+    parser.add_argument("--base-model", type=str, default="unsloth/Qwen3-4B-unsloth-bnb-4bit",
+                        help="Base model name")
+    parser.add_argument("--data", type=str, default="data/curriculum/val_fixed.json",
+                        help="Validation data path")
+    parser.add_argument("--max-samples", type=int, default=200)
+    parser.add_argument("--max-tokens", type=int, default=128)
+    args = parser.parse_args()
 
-    # 加载测试数据
+    model_path = args.model
+    data_path = args.data
+    max_samples = args.max_samples
+    max_new_tokens = args.max_tokens
+
+    # 加载验证数据 (curriculum format)
     with open(data_path, "r", encoding="utf-8") as f:
         raw_data = json.load(f)
 
     # 支持从指定偏移量开始
     offset = 0  # 从第1条开始评估
     test_samples = raw_data[offset:offset+max_samples]
-    print(f"加载测试数据: {len(test_samples)} 条 (从第 {offset+1} 条开始)"),
+    print(f"加载验证数据: {len(test_samples)} 条 (从第 {offset+1} 条开始)")
 
-    # 准备数据
+    # 准备数据 - 支持 curriculum format (conversations) 和旧 format
     prompts = []
     true_labels = []
     for item in test_samples:
-        label, review = extract_label_from_cot(item["text"])
-        if label != -1:
-            prompts.append(create_prompt(review))
-            true_labels.append(label)
+        # 尝试 curriculum format
+        if "conversations" in item:
+            # 从 conversations 提取 review
+            for msg in item["conversations"]:
+                if msg.get("role") == "user":
+                    review_match = re.search(r'Review:\s*([^<\n]+)', msg.get("content", ""))
+                    if review_match:
+                        review_text = review_match.group(1).strip()[:400]
+                        prompts.append(create_prompt(review_text))
+                        true_labels.append(item.get("label", -1))
+                    break
+        else:
+            # 旧 format
+            label, review = extract_label_from_cot(item.get("text", ""))
+            if label != -1:
+                prompts.append(create_prompt(review))
+                true_labels.append(label)
 
     print(f"有效样本: {len(prompts)}")
 
-    # 使用Unsloth加载模型（与训练时相同）
-    print(f"\n加载模型: {model_path}")
+    # 使用Unsloth加载模型 - base model + LoRA
+    print(f"\n加载基础模型: {args.base_model}")
+    print(f"加载LoRA适配器: {model_path}")
     model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=model_path,
+        model_name=args.base_model,
         max_seq_length=512,
-        load_in_4bit=True,  # 4bit节省显存，避免offload
+        load_in_4bit=True,
         load_in_8bit=False,
     )
+    # 加载LoRA权重
+    model = FastLanguageModel.get_peft_model(model)
+    model.load_adapter(model_path, adapter_name="default")
+    model.set_adapter("default")
     FastLanguageModel.for_inference(model)  # 启用推理优化
 
     print(f"模型已加载到: {next(model.parameters()).device}")
