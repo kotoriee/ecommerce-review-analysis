@@ -14,11 +14,7 @@
 | Phase 3 | 本地LLM (CoT数据标注 ✅, Qwen3-4B微调 ✅) | ✅ 完成 |
 | Phase 4 | 云端Agent (API批量推理) | ✅ 完成 ([api_eval_sentiment.py](code/cloud_agent/api_eval_sentiment.py)) |
 | Phase 5 | 评估框架 (三路对比实验) | ✅ 完成 ([metrics.py](code/evaluation/metrics.py), [run_comparison.py](code/evaluation/run_comparison.py)) |
-| Phase 6 | 论文写作 | ❌ 未开始 |
-
-**当前任务:** 运行 Phase 4/5 代码生成三路对比结果（代码已就绪，待执行）
-
-**当前瓶颈:** 需执行 API 批量推理获取 Phase 4 结果，然后运行三路对比
+| Phase 6 | 论文写作 | ✅ 完成 (6章, ~3万字, [d:/0321/thesis/](../thesis/)) |
 
 ---
 
@@ -79,8 +75,8 @@
         ├──► [SVM + TF-IDF]     → 预测结果 A (baseline)
         │
         ├──► [Qwen3-4B QLoRA]   → 预测结果 B (本地LLM)
-        │      └─ 在RTX 3060 Ti (8GB) 本地微调
-        │      └─ 40% 准确率, 5.4条/秒推理速度
+        │      └─ 在RTX 3070 Ti Laptop (8GB) 本地微调
+        │      └─ 早期训练 40% 准确率, 5.4条/秒推理速度（完整对比实验待执行）
         │
         └──► [Claude Agent]     → 预测结果 C (云端)
                      │
@@ -89,18 +85,22 @@
 
 ---
 
-## 本地LLM训练结果
+## 本地LLM训练结果（早期训练）
+
+> **注：** 以下为早期训练结果。完整三路对比实验（SVM vs QLoRA vs Claude Agent）代码已就绪，实验待执行。
 
 | 指标 | 数值 |
 |------|------|
 | **模型** | Qwen3-4B (unsloth-bnb-4bit) |
+| **硬件** | RTX 3070 Ti Laptop (8GB VRAM) |
 | **训练数据** | 6,033 条英文电商评论 |
 | **训练配置** | 3 epochs, 1131 steps, LoRA r=16 |
 | **训练时间** | 2小时40分 |
 | **显存峰值** | 4.4 GB / 8 GB |
-| **评估样本** | 1000 条测试集 |
-| **准确率** | **40%** |
+| **准确率（早期）** | **40%** |
 | **推理速度** | **5.4 条/秒** (325 条/分钟) |
+
+**SVM 基线结果（已测试）：** 65.3% 准确率（TF-IDF Unigram+Bigram, max_features=10K）
 
 **关键优化：**
 - 修复 OOM：将 LoRA rank 从 32 降至 16
@@ -144,13 +144,33 @@
 
 ---
 
+## 论文写作（已完成）
+
+**位置：** `d:/0321/thesis/`
+**语言：** 中文，约 30,000 字
+**题目：** 电商评论情感分析——传统NLP与大语言模型多路径对比研究
+
+| 章节 | 文件 | 核心内容 |
+|------|------|---------|
+| 摘要 | [abstract.md](../thesis/abstract.md) | 中英双语摘要 |
+| 第1章 | [chapter1_intro.md](../thesis/chapters/chapter1_intro.md) | 研究背景、意义、目标 |
+| 第2章 | [chapter2_literature.md](../thesis/chapters/chapter2_literature.md) | 情感分析演进、PEFT、知识蒸馏（最长章节）|
+| 第3章 | [chapter3_dataset.md](../thesis/chapters/chapter3_dataset.md) | MARC数据集、DeepSeek-R1软标签流水线（~8,527条，91%一致率）|
+| 第4章 | [chapter4_method.md](../thesis/chapters/chapter4_method.md) | 四路架构详细设计（SVM/GSDMM/QLoRA/Claude Agent）|
+| 第5章 | [chapter5_experiment.md](../thesis/chapters/chapter5_experiment.md) | 对比实验设计、SVM基线结果（65.3%）、消融实验 |
+| 第6章 | [chapter6_conclusion.md](../thesis/chapters/chapter6_conclusion.md) | 四大贡献、四点局限性、五个未来方向 |
+
+**参考文献：** [references.bib](../thesis/references/references.bib) — 33条BibTeX，已全部核查修正
+
+---
+
 ## 待办清单
 
 - [x] **[高]** Phase 3: 本地 Qwen3-4B 微调完成 ✅
-- [ ] **[高]** 提升模型准确率（40% → 60-70%）
-- [ ] **[高]** Phase 4: 执行 API 批量推理
+- [x] **[高]** Phase 6: 论文写作完成 ✅ (~3万字)
+- [ ] **[高]** Phase 4: 执行 Claude API 批量推理（695条测试集）
 - [ ] **[高]** Phase 5: 执行三路对比 + 生成报告
-- [ ] **[中]** Phase 6: 撰写论文 Chapter 2（系统设计）和 Chapter 3（实验）
+- [ ] **[中]** 用实际对比实验结果更新论文第5章数据
 
 ---
 

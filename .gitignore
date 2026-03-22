@@ -24,10 +24,19 @@ ENV/
 data/raw/*.json
 data/raw/**/._____temp/
 data/processed/*.jsonl
+data/processed/*.json
+data/curriculum/
 models/*/checkpoint-*/
+models/curriculum/
 *.safetensors
 *.bin
 *.gguf
+
+# Dev environment
+.venv/
+.coverage
+unsloth_compiled_cache/
+.claude/
 
 # Logs
 *.log
