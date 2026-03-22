@@ -39,10 +39,11 @@ Output format: {{"sentiment": X, "confidence": Y.YZ, "rationale": "explanation"}
 Review: {review_text}<|im_end|>
 <|im_start|>assistant
 <think>
+"""
 
 
 def extract_sentiment(text: str) -> int:
-    """从输出提取情感标签（支持 CoT thinking 格式）"""
+    """从输出提取情感标签 (支持 CoT thinking 格式)"""
     text_lower = text.lower()
 
     # 首先尝试提取 JSON 格式

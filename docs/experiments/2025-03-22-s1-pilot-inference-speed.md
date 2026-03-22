@@ -106,3 +106,34 @@
 - [vLLM 官方文档](https://docs.vllm.ai/)
 - [Unsloth 推理优化](https://docs.unsloth.ai/basics/inference)
 - [Ollama 本地部署](https://ollama.com/)
+
+---
+
+## 更新：Unsloth Batch Inference 实测 (S5)
+
+**配置**:
+- Batch size: 16
+- Samples: 500
+- Batches: 32
+- 硬件: RTX 3070Ti 8GB
+
+**实测速度**:
+```
+~25秒/批次 (16条)
+预计总时间: ~13分钟 (32批次)
+速度: ~0.6条/秒 (40条/分钟)
+```
+
+**对比**:
+| 方法 | 速度 | 500条耗时 |
+|------|------|-----------|
+| Unsloth 单条 | 0.11条/秒 | ~75分钟 |
+| **Unsloth 批量 (bs=16)** | **~0.6条/秒** | **~13分钟** |
+| Ollama/GGUF (预计) | ~25条/秒 | ~20秒 |
+
+**瓶颈分析**:
+- 25秒/批次过慢，理论应在 5-8秒/批次
+- 可能是 WSL I/O 或 tokenization 开销
+- 后续改用 Ollama/GGUF 方案 (~25条/秒)
+
+**结论**: Unsloth 批量比单条快 6x，但仍不够快。Ollama/GGUF 是最佳选择。
