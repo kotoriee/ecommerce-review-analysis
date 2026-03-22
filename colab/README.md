@@ -7,8 +7,8 @@
 | 环境 | 方法 | 速度 | 500条耗时 |
 |------|------|------|-----------|
 | 本地 RTX 3070Ti | Unsloth 单条 | 0.11 条/秒 | ~75 分钟 |
-| 本地 RTX 3070Ti | vLLM 批量 | ~10 条/秒 | ~1 分钟 |
-| **Colab T4** | **vLLM 批量** | **~15 条/秒** | **~30 秒** |
+| 本地 RTX 3070Ti | Unsloth 批量 | ~0.6 条/秒 | ~13 分钟 |
+| **Colab T4** | **Unsloth 批量** | **~1-2 条/秒** | **~5-8 分钟** |
 
 ## 快速开始
 
@@ -22,7 +22,7 @@
 %cd ecommerce-review-analysis
 
 # 2. 安装依赖
-!pip install vllm transformers -q
+!pip install unsloth trl datasets -q
 
 # 3. 下载模型 (从 HuggingFace 或 Google Drive)
 # 选项 A: 从 HuggingFace (如果已上传)

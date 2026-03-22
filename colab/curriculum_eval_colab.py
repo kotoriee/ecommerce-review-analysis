@@ -34,6 +34,9 @@ def parse_args():
                         help="Directory containing LoRA adapters")
     parser.add_argument("--data-dir", type=str, default="./data/curriculum",
                         help="Directory containing validation data")
+    parser.add_argument("--base-model", type=str,
+                        default="unsloth/Qwen3-4B-unsloth-bnb-4bit",
+                        help="Base model name (Hugging Face ID)")
     parser.add_argument("--samples", type=int, default=500,
                         help="Number of validation samples to evaluate")
     parser.add_argument("--batch-size", type=int, default=64,
@@ -44,7 +47,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def get_model_and_data(stage: str, model_dir: str, data_dir: str) -> Tuple[str, str]:
+def get_model_and_data(stage: str, model_dir: str, data_dir: str) -> Tuple[str, str, str]:
     """根据 stage 获取模型路径和数据路径"""
     stage_map = {
         "s1": ("lora_s1_600", "600"),
@@ -55,14 +58,14 @@ def get_model_and_data(stage: str, model_dir: str, data_dir: str) -> Tuple[str, 
     }
 
     model_name, data_suffix = stage_map[stage]
-    model_path = f"{model_dir}/{model_name}"
+    lora_path = f"{model_dir}/{model_name}"
 
     # 检查模型是否存在
-    if not Path(model_path).exists():
-        print(f"⚠️  模型不存在: {model_path}")
+    if not Path(lora_path).exists():
+        print(f"⚠️  模型不存在: {lora_path}")
         print(f"   请确保从 GitHub 下载了模型或使用 Google Drive 挂载")
 
-    return model_path, f"{data_dir}/val_fixed.json"
+    return lora_path, f"{data_dir}/val_fixed.json", model_name
 
 
 def create_prompt(review_text: str) -> str:
@@ -129,28 +132,30 @@ def extract_sentiment(text: str) -> int:
         return 1
 
 
-def evaluate_with_vllm(model_path: str, samples: List[dict], batch_size: int, max_tokens: int):
-    """使用 vLLM 批量评估"""
-    from vllm import LLM, SamplingParams
+def evaluate_with_unsloth(base_model: str, lora_path: str, samples: List[dict], batch_size: int, max_tokens: int):
+    """使用 Unsloth 批量评估 (Colab T4 优化版)"""
+    from unsloth import FastLanguageModel
+    import torch
 
-    print(f"🚀 加载 vLLM 模型: {model_path}")
+    print(f"🚀 加载 Unsloth 模型")
+    print(f"   Base: {base_model}")
+    print(f"   LoRA: {lora_path}")
     print(f"   样本数: {len(samples)}, Batch: {batch_size}")
 
-    # vLLM 加载 - Colab T4 优化参数
-    llm = LLM(
-        model=model_path,
-        dtype="float16",  # T4 不支持 bfloat16
-        gpu_memory_utilization=0.90,
-        max_model_len=512,
-        trust_remote_code=True,
-        quantization=None,  # LoRA 需要非量化基础模型
+    # 加载基础模型 (4-bit 节省显存)
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        model_name=base_model,
+        max_seq_length=512,
+        load_in_4bit=True,
     )
 
-    sampling_params = SamplingParams(
-        temperature=0.1,
-        max_tokens=max_tokens,
-        stop=["<|im_end|>", "</thinking>"],
-    )
+    # 加载 LoRA
+    model = FastLanguageModel.get_peft_model(model)
+    model.load_adapter(lora_path, adapter_name="default")
+    model.set_adapter("default")
+    FastLanguageModel.for_inference(model)
+
+    print(f"   模型已加载到: {next(model.parameters()).device}")
 
     # 准备 prompts
     prompts = [create_prompt(s["review"]) for s in samples]
@@ -161,27 +166,55 @@ def evaluate_with_vllm(model_path: str, samples: List[dict], batch_size: int, ma
     start_time = time.time()
 
     all_outputs = []
-    for i in range(0, len(prompts), batch_size):
-        batch = prompts[i:i + batch_size]
-        outputs = llm.generate(batch, sampling_params)
-        all_outputs.extend(outputs)
+    total_batches = (len(prompts) + batch_size - 1) // batch_size
 
-        if (i // batch_size + 1) % 5 == 0:
+    for i in range(0, len(prompts), batch_size):
+        batch_prompts = prompts[i:i + batch_size]
+
+        # Tokenize batch
+        inputs = tokenizer(
+            batch_prompts,
+            return_tensors="pt",
+            truncation=True,
+            max_length=512,
+            padding=True
+        )
+        inputs = {k: v.to(model.device) for k, v in inputs.items()}
+
+        # Generate
+        with torch.no_grad():
+            outputs = model.generate(
+                **inputs,
+                max_new_tokens=max_tokens,
+                temperature=0.1,
+                do_sample=True,
+                use_cache=True,
+                pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id,
+            )
+
+        # Decode (skip input tokens)
+        input_len = inputs['input_ids'].shape[1]
+        for output in outputs:
+            response = tokenizer.decode(output[input_len:], skip_special_tokens=True)
+            all_outputs.append(response)
+
+        # 进度显示
+        current_batch = i // batch_size + 1
+        if current_batch % 5 == 0 or current_batch == 1:
             progress = min((i + batch_size), len(prompts))
-            print(f"   进度: {progress}/{len(prompts)}")
+            print(f"   进度: {progress}/{len(prompts)} ({current_batch}/{total_batches} 批次)")
 
     infer_time = time.time() - start_time
     speed = len(all_outputs) / infer_time
 
-    print(f"\n✅ 推理完成: {infer_time:.1f}s ({speed:.1f} 条/秒, {speed*60:.0f} 条/分钟)")
+    print(f"\n✅ 推理完成: {infer_time:.1f}s ({speed:.2f} 条/秒, {speed*60:.1f} 条/分钟)")
 
     # 解析结果
     results = []
     correct = 0
     class_stats = {0: {"total": 0, "correct": 0}, 1: {"total": 0, "correct": 0}, 2: {"total": 0, "correct": 0}}
 
-    for i, output in enumerate(all_outputs):
-        pred_text = output.outputs[0].text
+    for i, pred_text in enumerate(all_outputs):
         pred_label = extract_sentiment(pred_text)
         true_label = true_labels[i]
 
@@ -222,13 +255,17 @@ def main():
     print("=" * 60)
 
     # 获取路径
-    model_path, data_path = get_model_and_data(args.stage, args.model_dir, args.data_dir)
+    lora_path, data_path, model_name = get_model_and_data(args.stage, args.model_dir, args.data_dir)
 
     # 检查文件
     if not Path(data_path).exists():
         print(f"❌ 数据文件不存在: {data_path}")
         print("   请从 GitHub 下载数据:")
         print("   !git clone https://github.com/kotoriee/ecommerce-review-analysis.git")
+        return
+
+    if not Path(lora_path).exists():
+        print(f"❌ LoRA 模型不存在: {lora_path}")
         return
 
     # 加载数据
@@ -241,8 +278,9 @@ def main():
         return
 
     # 评估
-    eval_result = evaluate_with_vllm(
-        model_path=model_path,
+    eval_result = evaluate_with_unsloth(
+        base_model=args.base_model,
+        lora_path=lora_path,
         samples=samples,
         batch_size=args.batch_size,
         max_tokens=args.max_tokens,
@@ -278,6 +316,10 @@ def main():
         for i, e in enumerate(errors):
             print(f"\n{i+1}. 真实={e['true']}, 预测={e['pred']}")
             print(f"   评论: {e['review'][:80]}...")
+
+
+if __name__ == "__main__":
+    main()
 
 
 if __name__ == "__main__":
