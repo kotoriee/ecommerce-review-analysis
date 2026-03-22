@@ -16,9 +16,11 @@ def parse_args():
     parser.add_argument("--stage", type=str, default="s5",
                         choices=["s1", "s2", "s3", "s4", "s5"],
                         help="Stage to evaluate")
+    parser.add_argument("--merged-model", type=str, default=None,
+                        help="Path to merged model (overrides --stage)")
     parser.add_argument("--base-model", type=str,
                         default="unsloth/Qwen3-4B-unsloth-bnb-4bit",
-                        help="Base model name")
+                        help="Base model name (for LoRA mode)")
     parser.add_argument("--model-dir", type=str, default="./models/curriculum",
                         help="Directory containing LoRA adapters")
     parser.add_argument("--data", type=str,
@@ -105,6 +107,98 @@ def extract_sentiment(text: str) -> int:
         return 1
 
 
+def evaluate_with_vllm_merged(
+    model_path: str,
+    samples: list,
+    batch_size: int,
+    max_tokens: int
+):
+    """Evaluate using vLLM with merged model (stable)"""
+    from vllm import LLM, SamplingParams
+
+    print(f"🚀 Loading vLLM model: {model_path}")
+    print(f"   Samples: {len(samples)}, Batch: {batch_size}")
+
+    # Load merged model (more stable than LoRA)
+    llm = LLM(
+        model=model_path,
+        dtype="float16",
+        gpu_memory_utilization=0.85,
+        max_model_len=512,
+        trust_remote_code=True,
+    )
+
+    sampling_params = SamplingParams(
+        temperature=0.1,
+        max_tokens=max_tokens,
+        stop=["<|im_end|>", "</think>"],
+    )
+
+    # Prepare prompts
+    prompts = [create_prompt(s["review"]) for s in samples]
+    true_labels = [s["label"] for s in samples]
+
+    # Batch inference
+    print(f"\n⏱️  Starting batch inference...")
+    start_time = time.time()
+
+    all_outputs = []
+    for i in range(0, len(prompts), batch_size):
+        batch = prompts[i:i + batch_size]
+        outputs = llm.generate(batch, sampling_params)
+        all_outputs.extend(outputs)
+
+        if (i // batch_size + 1) % 5 == 0 or i == 0:
+            progress = min((i + batch_size), len(prompts))
+            print(f"   Progress: {progress}/{len(prompts)}")
+
+    infer_time = time.time() - start_time
+    speed = len(all_outputs) / infer_time
+
+    print(f"\n✅ Inference complete: {infer_time:.1f}s")
+    print(f"   Speed: {speed:.1f} samples/sec ({speed*60:.0f} samples/min)")
+
+    # Parse results
+    results = []
+    correct = 0
+    class_stats = {0: {"total": 0, "correct": 0},
+                   1: {"total": 0, "correct": 0},
+                   2: {"total": 0, "correct": 0}}
+
+    for i, output in enumerate(all_outputs):
+        pred_text = output.outputs[0].text
+        pred_label = extract_sentiment(pred_text)
+        true_label = true_labels[i]
+
+        is_correct = (pred_label == true_label)
+        if is_correct:
+            correct += 1
+
+        class_stats[true_label]["total"] += 1
+        if is_correct:
+            class_stats[true_label]["correct"] += 1
+
+        results.append({
+            "true": true_label,
+            "pred": pred_label,
+            "correct": is_correct,
+            "review": samples[i]["review"][:100],
+            "raw": pred_text[:150],
+        })
+
+    accuracy = correct / len(results) * 100
+
+    return {
+        "accuracy": accuracy,
+        "total": len(results),
+        "correct": correct,
+        "time": infer_time,
+        "speed": speed,
+        "class_stats": class_stats,
+        "results": results,
+    }
+
+
 def evaluate_with_vllm_lora(
     base_model: str,
     lora_path: str,
@@ -125,7 +219,7 @@ def evaluate_with_vllm_lora(
     llm = LLM(
         model=base_model,
         dtype="float16",  # RTX 3070Ti supports float16
-        gpu_memory_utilization=0.90,
+        gpu_memory_utilization=0.75,  # Lower for 8GB VRAM
         max_model_len=512,
         trust_remote_code=True,
         enable_lora=True,  # Enable LoRA support
@@ -217,16 +311,22 @@ def evaluate_with_vllm_lora(
 def main():
     args = parse_args()
 
-    print("=" * 60)
-    print(f"🎓 vLLM + LoRA Evaluation - {args.stage.upper()}")
-    print("=" * 60)
+    # Determine model path
+    if args.merged_model:
+        model_path = args.merged_model
+        mode = "merged"
+    else:
+        model_path = get_model_path(args.stage, args.model_dir) + "_merged_16bit"
+        mode = "merged"
 
-    # Get paths
-    lora_path = get_model_path(args.stage, args.model_dir)
+    print("=" * 60)
+    print(f"🎓 vLLM Evaluation - {args.stage.upper() if not args.merged_model else 'Custom'}")
+    print("=" * 60)
 
     # Check files
-    if not Path(lora_path).exists():
-        print(f"❌ LoRA adapter not found: {lora_path}")
+    if not Path(model_path).exists():
+        print(f"❌ Model not found: {model_path}")
+        print(f"   Please run: python code/local_llm/export_merged_models.py --stages {args.stage}")
         return
 
     if not Path(args.data).exists():
@@ -242,10 +342,9 @@ def main():
         print("❌ No valid samples")
         return
 
-    # Evaluate
-    eval_result = evaluate_with_vllm_lora(
-        base_model=args.base_model,
-        lora_path=lora_path,
+    # Evaluate with merged model (more stable)
+    eval_result = evaluate_with_vllm_merged(
+        model_path=model_path,
         samples=samples,
         batch_size=args.batch_size,
         max_tokens=args.max_tokens,
