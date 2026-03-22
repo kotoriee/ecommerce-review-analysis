@@ -33,11 +33,12 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional, Union
 from datetime import datetime
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+_CODE_DIR = Path(__file__).parent.parent
+sys.path.insert(0, str(_CODE_DIR))
 
-from local_llm.inference.predictor import OllamaPredictor
-from local_llm.inference.schemas import LLMPrediction, BatchPredictionResult
-from baseline.sentiment.svm_classifier import SVMSentimentClassifier, SVMConfig
+from local_llm.predictor import OllamaPredictor
+from local_llm.schemas import LLMPrediction, BatchPredictionResult
+from baseline.svm_classifier import SVMSentimentClassifier, SVMConfig
 
 
 # ============== Language Detection ==============
