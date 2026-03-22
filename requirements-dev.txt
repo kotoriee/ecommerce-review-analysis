@@ -1,0 +1,47 @@
+# 开发环境依赖 (WSL2, 无需CUDA)
+# 去掉: unsloth, vllm, bitsandbytes, autoawq (需要CUDA/GPU驱动)
+
+# 核心
+pydantic>=2.0.0
+tqdm>=4.65.0
+pyyaml>=6.0
+python-dotenv>=1.0.0
+
+# 数据处理
+datasets>=2.14.0
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+
+# 多语言 NLP
+jieba>=0.42.1
+nltk>=3.8.1
+natasha>=1.6.0
+
+# 传统机器学习
+scikit-learn>=1.3.0
+gensim>=4.3.0
+vaderSentiment>=3.3.2
+snownlp>=0.12.3
+
+# LLM (仅推理接口，不含训练)
+transformers>=4.36.0
+peft>=0.7.0
+accelerate>=0.25.0
+sentencepiece>=0.1.99
+protobuf>=3.20.0
+
+# 云端 Agent
+openai>=1.6.0
+anthropic>=0.8.0
+aiohttp>=3.9.0
+tenacity>=8.2.0
+
+# 评估与可视化
+matplotlib>=3.7.0
+seaborn>=0.12.0
+plotly>=5.18.0
+
+# 开发工具
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
