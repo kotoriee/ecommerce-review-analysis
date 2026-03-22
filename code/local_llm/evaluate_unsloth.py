@@ -99,27 +99,42 @@ def main():
     test_samples = raw_data[offset:offset+max_samples]
     print(f"加载验证数据: {len(test_samples)} 条 (从第 {offset+1} 条开始)")
 
-    # 准备数据 - 支持 curriculum format (conversations) 和旧 format
+    # 准备数据 - 支持多种格式: curriculum/conversations, Alpaca, 旧CoT
     prompts = []
     true_labels = []
     for item in test_samples:
-        # 尝试 curriculum format
+        review_text = None
+        label = -1
+
+        # 1. 尝试 curriculum format (conversations)
         if "conversations" in item:
-            # 从 conversations 提取 review
             for msg in item["conversations"]:
                 if msg.get("role") == "user":
                     review_match = re.search(r'Review:\s*([^<\n]+)', msg.get("content", ""))
                     if review_match:
                         review_text = review_match.group(1).strip()[:400]
-                        prompts.append(create_prompt(review_text))
-                        true_labels.append(item.get("label", -1))
                     break
-        else:
-            # 旧 format
+            label = item.get("label", -1)
+
+        # 2. 尝试 Alpaca format (instruction/input/output)
+        elif "input" in item and "output" in item:
+            review_text = item.get("input", "").strip()[:400]
+            try:
+                label = int(item.get("output", "-1").strip())
+            except ValueError:
+                label = -1
+
+        # 3. 尝试旧CoT format
+        elif "text" in item:
             label, review = extract_label_from_cot(item.get("text", ""))
-            if label != -1:
-                prompts.append(create_prompt(review))
-                true_labels.append(label)
+            review_text = review
+
+        # 验证并添加
+        if review_text and label in [0, 1, 2]:
+            prompts.append(create_prompt(review_text))
+            true_labels.append(label)
+
+    print(f"有效样本: {len(prompts)} (负={sum(1 for l in true_labels if l==0)}, 中={sum(1 for l in true_labels if l==1)}, 正={sum(1 for l in true_labels if l==2)})")
 
     print(f"有效样本: {len(prompts)}")
 
