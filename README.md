@@ -12,15 +12,29 @@
 | Phase 1 | 数据层 (schema / loader / preprocessor / merger) | ✅ 完成 (86 tests passing) |
 | Phase 2 | 传统NLP基线 (SVM ✅, LDA ✅, GSDMM ✅) | ✅ 完成 |
 | Phase 3 | 本地LLM (CoT数据标注 ✅, Qwen3-4B微调 ✅) | ✅ 完成 |
-| Phase 4 | 云端Agent (Claude API批量推理) | 🔄 部分完成 |
-| Phase 5 | 评估框架 (三路对比实验) | ❌ 未开始 |
+| Phase 4 | 云端Agent (API批量推理) | ✅ 完成 ([api_eval_sentiment.py](code/cloud_agent/api_eval_sentiment.py)) |
+| Phase 5 | 评估框架 (三路对比实验) | ✅ 完成 ([metrics.py](code/evaluation/metrics.py), [run_comparison.py](code/evaluation/run_comparison.py)) |
 | Phase 6 | 论文写作 | ❌ 未开始 |
 
-**当前瓶颈:** Phase 3 Qwen3-8B 在 C2Net (Ascend 910) 上微调
+**当前任务:** 运行 Phase 4/5 代码生成三路对比结果（代码已就绪，待执行）
+
+**当前瓶颈:** 需执行 API 批量推理获取 Phase 4 结果，然后运行三路对比
 
 ---
 
 ## 关键文件索引
+
+### Phase 4 & 5 (Cloud Agent + Evaluation) - 已就绪
+| 路径 | 内容 | 状态 |
+|------|------|------|
+| [code/cloud_agent/api_eval_sentiment.py](code/cloud_agent/api_eval_sentiment.py) | API情感分析 (DeepSeek/Qwen/Claude) | ✅ 就绪 |
+| [code/cloud_agent/run_3cls_annotation.py](code/cloud_agent/run_3cls_annotation.py) | R1蒸馏标注（软标签生成） | ✅ 已运行 (4564条) |
+| [code/cloud_agent/batch_sentiment.py](code/cloud_agent/batch_sentiment.py) | Ollama本地批量推理 | ✅ 就绪 |
+| [code/evaluation/run_comparison.py](code/evaluation/run_comparison.py) | 三路对比主程序 | ✅ 就绪 |
+| [code/evaluation/metrics.py](code/evaluation/metrics.py) | 评估指标 (F1/Acc/Confusion) | ✅ 就绪 |
+| [code/evaluation/run_svm_baseline.py](code/evaluation/run_svm_baseline.py) | SVM基线训练评估 | ✅ 就绪 |
+| [code/evaluation/visualize.py](code/evaluation/visualize.py) | 对比图表生成 | ✅ 就绪 |
+| [code/evaluation/generate_report.py](code/evaluation/generate_report.py) | Markdown/LaTeX报告 | ✅ 就绪 |
 
 ### 本文件夹
 | 文件 | 内容 |
@@ -34,15 +48,13 @@
 | [literature/reading_prompt.md](literature/reading_prompt.md) | 文献精读提示词（直接用于AI） |
 | [literature/literature_review.md](literature/literature_review.md) | 已完成的文献综述 |
 
-### 代码库 (code/ecommerce_analysis/)
+### 核心代码库 (code/)
 | 路径 | 内容 |
 |------|------|
-| [data/schema.py](../code/ecommerce_analysis/data/schema.py) | 全局数据契约（核心，勿随意改） |
-| [data/loader.py](../code/ecommerce_analysis/data/loader.py) | HuggingFace 数据加载 |
-| [baseline/sentiment/svm_classifier.py](../code/ecommerce_analysis/baseline/sentiment/svm_classifier.py) | SVM+TF-IDF 分类器 |
-| [baseline/topic/gsdmm_model.py](../code/ecommerce_analysis/baseline/topic/gsdmm_model.py) | GSDMM短文本主题模型（学术创新） |
-| [cloud_agent/scripts/batch_sentiment.py](../code/ecommerce_analysis/cloud_agent/scripts/batch_sentiment.py) | Claude API 批量推理 |
-| [local_llm/inference/predictor.py](../code/ecommerce_analysis/local_llm/inference/predictor.py) | Ollama 本地推理 |
+| [code/data/schema.py](code/data/schema.py) | 全局数据契约（核心，勿随意改） |
+| [code/data/loader.py](code/data/loader.py) | HuggingFace 数据加载 |
+| [code/baseline/svm_classifier.py](code/baseline/svm_classifier.py) | SVM+TF-IDF 分类器 |
+| [code/baseline/gsdmm_model.py](code/baseline/gsdmm_model.py) | GSDMM短文本主题模型（学术创新） |
 
 ### 本地LLM训练 (code/local_llm/)
 | 路径 | 内容 |
@@ -105,14 +117,40 @@
 
 ---
 
-## 下一步行动（优先级排序）
+## 下一步行动（执行阶段）
 
-- [x] **[高]** 完成本地 Qwen3-4B 微调，获取 Phase 3 结果 ✅
-- [ ] **[高]** 优化模型准确率（目标 60-70%，当前 40%）
-- [ ] **[高]** 用 Claude API 跑完测试集，获取 Phase 4 结果
-- [ ] **[中]** 实现 evaluation/compare.py 三路对比
-- [ ] **[中]** 生成对比图表（F1/延迟/成本）
-- [ ] **[低]** 撰写论文 Chapter 2（系统设计）和 Chapter 3（实验）
+**Phase 4/5 代码已就绪，待执行：**
+
+1. **SVM基线** - `python code/evaluation/run_svm_baseline.py`
+   - 输入: data/processed/train_3cls.json + test_3cls.json
+   - 输出: data/results/svm_predictions.jsonl
+
+2. **API推理** - `python code/cloud_agent/api_eval_sentiment.py`
+   - 输入: data/processed/test_3cls.json
+   - 输出: data/results/api_predictions.jsonl
+
+3. **本地LLM推理** - 跑 evaluate_unsloth.py 或 predictor.py
+   - 输出: data/results/local_llm_predictions.jsonl
+
+4. **三路对比** - `python code/evaluation/run_comparison.py`
+   - 输入: 上述三个预测文件
+   - 输出: data/results/comparison_results.json
+
+5. **生成报告** - `python code/evaluation/generate_report.py`
+   - 输出: data/results/summary.md + summary_latex.tex
+
+6. **生成图表** - `python code/evaluation/visualize.py`
+   - 输出: data/results/charts/ (F1对比/混淆矩阵/延迟成本)
+
+---
+
+## 待办清单
+
+- [x] **[高]** Phase 3: 本地 Qwen3-4B 微调完成 ✅
+- [ ] **[高]** 提升模型准确率（40% → 60-70%）
+- [ ] **[高]** Phase 4: 执行 API 批量推理
+- [ ] **[高]** Phase 5: 执行三路对比 + 生成报告
+- [ ] **[中]** Phase 6: 撰写论文 Chapter 2（系统设计）和 Chapter 3（实验）
 
 ---
 

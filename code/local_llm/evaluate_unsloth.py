@@ -26,14 +26,20 @@ def extract_label_from_cot(text: str) -> tuple[int, str]:
 
 
 def create_prompt(review_text: str) -> str:
-    """构建推理prompt"""
+    """构建推理prompt - 与训练格式统一"""
     return f"""<|im_start|>system
-You are a sentiment analysis expert. Output ONLY JSON with no explanation:
-{{"sentiment": 0 or 1 or 2}} where 0=negative, 1=neutral, 2=positive<|im_end|>
+You are a sentiment analysis expert for e-commerce reviews.
+Analyze the review and output ONLY a JSON object with these exact fields:
+- sentiment: 0 (negative), 1 (neutral), or 2 (positive)
+- confidence: float between 0 and 1
+- rationale: brief explanation in English
+
+Output format: {{"sentiment": X, "confidence": Y.YZ, "rationale": "explanation"}}<|im_end|>
 <|im_start|>user
 Review: {review_text}<|im_end|>
 <|im_start|>assistant
-{{"sentiment": """
+<thinking>
+"""
 
 
 def extract_sentiment(text: str) -> int:

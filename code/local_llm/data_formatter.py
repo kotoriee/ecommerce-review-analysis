@@ -17,10 +17,11 @@ from pathlib import Path
 from typing import List, Dict, Tuple
 
 # ============== 系统提示词 ==============
+# 三分类情感分析 (0=negative, 1=neutral, 2=positive)
 
 SYSTEM_PROMPT = """You are a sentiment analysis expert for e-commerce reviews.
 Analyze the review and output ONLY a JSON object with these exact fields:
-- sentiment: 0 (negative) or 1 (positive)
+- sentiment: 0 (negative), 1 (neutral), or 2 (positive)
 - confidence: float between 0 and 1
 - rationale: brief explanation in English
 
@@ -45,11 +46,12 @@ def record_to_conversation(record: Dict) -> Dict:
     if cot:
         think_content = cot[:1000]  # 限制长度
     else:
+        # 三分类映射
         sentiment_words = {0: "negative", 1: "neutral", 2: "positive"}
         think_content = (
             f"Let me analyze this review.\n"
             f"Key observation: {rationale}\n"
-            f"Conclusion: {sentiment_words[label]} sentiment."
+            f"Conclusion: {sentiment_words.get(label, 'neutral')} sentiment."
         )
 
     assistant_content = (

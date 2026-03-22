@@ -102,13 +102,16 @@ def load_ground_truth(gt_path: str) -> List[int]:
 
     labels = []
     for item in data:
-        # 支持多种格式
+        # 支持多种格式（优先级：ground_truth_label > sentiment_label > label > output）
         if "ground_truth_label" in item:
-            labels.append(item["ground_truth_label"])
+            labels.append(int(item["ground_truth_label"]))
         elif "sentiment_label" in item:
-            labels.append(item["sentiment_label"])
+            labels.append(int(item["sentiment_label"]))
         elif "label" in item:
-            labels.append(item["label"])
+            labels.append(int(item["label"]))
+        elif "output" in item:
+            # *_3cls.json 格式：output 字段值为字符串 "0"/"1"/"2"
+            labels.append(int(item["output"]))
     return labels
 
 

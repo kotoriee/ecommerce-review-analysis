@@ -164,23 +164,24 @@ def main():
     print(f"\nLoRA adapters 已保存: {output_dir}")
 
     # 10. 导出合并版本（用于 vLLM / Ollama）
-    merged_dir = str(output_dir) + "_merged_16bit"
-    print(f"\n导出合并模型（16bit）→ {merged_dir}")
-    model.save_pretrained_merged(merged_dir, tokenizer, save_method="merged_16bit")
+    # NOTE: 暂时注释掉以加速迭代，最终模型再导出
+    # merged_dir = str(output_dir) + "_merged_16bit"
+    # print(f"\n导出合并模型（16bit）→ {merged_dir}")
+    # model.save_pretrained_merged(merged_dir, tokenizer, save_method="merged_16bit")
 
-    gguf_dir = str(output_dir) + "_gguf"
-    print(f"导出 GGUF（q4_k_m）→ {gguf_dir}")
-    model.save_pretrained_gguf(gguf_dir, tokenizer, quantization_method="q4_k_m")
+    # gguf_dir = str(output_dir) + "_gguf"
+    # print(f"导出 GGUF（q4_k_m）→ {gguf_dir}")
+    # model.save_pretrained_gguf(gguf_dir, tokenizer, quantization_method="q4_k_m")
 
     print("\n" + "=" * 60)
     print("微调完成！")
     print(f"  LoRA adapters:  {output_dir}")
-    print(f"  合并 16bit:     {merged_dir}")
-    print(f"  GGUF (Ollama):  {gguf_dir}.Q4_K_M.gguf")
+    # print(f"  合并 16bit:     {merged_dir}")
+    # print(f"  GGUF (Ollama):  {gguf_dir}.Q4_K_M.gguf")
     print("=" * 60)
     print("\n下一步：运行推理验证")
-    print("  ollama create qwen3-sentiment -f Modelfile")
-    print("  python local_llm/inference/predictor.py")
+    # print("  ollama create qwen3-sentiment -f Modelfile")
+    print("  python local_llm/evaluate_unsloth.py --model {output_dir} --data data/curriculum/val_fixed.json")
 
 
 if __name__ == "__main__":
