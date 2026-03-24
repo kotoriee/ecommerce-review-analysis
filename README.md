@@ -17,6 +17,34 @@
 | Phase 5 | 评估框架 (三路对比实验) | ✅ 完成 ([metrics.py](code/evaluation/metrics.py), [run_comparison.py](code/evaluation/run_comparison.py)) |
 | Phase 6 | 论文写作 | ✅ 完成 (6章, ~3万字, [d:/0321/thesis/](../thesis/)) |
 | **Phase 7** | **知识蒸馏训练** | **✅ 完成 (86.50%准确率, 课程学习)** |
+| **Phase 7.5** | **动态温度蒸馏** | **✅ 完成 (95.80%准确率, +9.30%)** |
+
+---
+
+## 动态温度蒸馏实验成果 (Phase 7.5) ⭐
+
+> **2026-03-24 完成 - 重大突破！**
+
+基于 EMNLP 2024 "Calibrating Long-form Generations" 的动态温度策略，实现软标签蒸馏的重大突破：
+
+| 指标 | 动态温度 (本实验) | 固定温度 (基线) | 提升 |
+|------|-------------------|-----------------|------|
+| **准确率** | **95.80%** | 86.50% | **+9.30%** |
+| 中性类召回 | 94.53% | 80.5% | +14.03% |
+| ECE (校准误差) | 0.0162 | - | 优秀 |
+| 置信度-准确率差距 | 0.0122 | - | 优秀 |
+
+**核心创新：** 根据样本置信度自适应调整蒸馏温度 (1.5-3.0)
+- 高置信度 (>0.9): T=1.5，保留锐利分布
+- 中等置信度 (0.6-0.9): T=2.0，标准平滑
+- 低置信度 (<0.6): T=2.5-3.0，更强平滑
+
+**关键发现：** 动态温度策略显著优于固定温度，特别是在解决中性类识别难题上效果突出。
+
+📁 **实验代码**: [experiments/adaptive_temperature/](experiments/adaptive_temperature/)
+📊 **详细记录**: [EXPERIMENT_LOG.md](experiments/adaptive_temperature/EXPERIMENT_LOG.md)
+
+---
 
 ## 新增：R1蒸馏软标注流水线 (Phase 4.5)
 
@@ -295,6 +323,7 @@ python .claude/skills/soft-label-review/scripts/analyze_quality.py \
 - [x] **[高]** Phase 4.5: Soft-Label-Review Skill 开发完成
 - [x] **[高]** Phase 6: 论文写作完成 (~3万字)
 - [x] **[高]** Phase 7: 软标签蒸馏训练完成（86.50%准确率）
+- [x] **[高]** Phase 7.5: 动态温度蒸馏完成（95.80%准确率）
 - [x] **[高]** Skill 安装: soft-label-review 技能已安装到 Claude Code
 
 ### 待执行 ⏳
@@ -310,7 +339,7 @@ python .claude/skills/soft-label-review/scripts/analyze_quality.py \
 
 | 实验 | 优先级 | 预期收益 | 状态 |
 |------|--------|----------|------|
-| [动态温度缩放](experiments/adaptive_temperature/) | 高 | +1-2% | ⏳ 待进行 |
+| [动态温度缩放](experiments/adaptive_temperature/) | 高 | +9.30% | ✅ 已完成 (95.80%) |
 | [置信度校准](experiments/calibration/) | 高 | 改善校准 | ⏳ 待进行 |
 | [课程学习优化](experiments/curriculum_learning/) | 高 | +0.5-1% | ⏳ 待进行 |
 | [对比学习增强](experiments/contrastive_learning/) | 中 | +1-2% | ⏳ 待进行 |
