@@ -87,6 +87,9 @@ Conclusion: {"negative" if label==0 else "neutral" if label==1 else "positive"} 
 </think>
 {{"sentiment": {label}, "confidence": {confidence:.2f}, "rationale": "{rationale}"}}'''
 
+    # Preserve soft_labels from original data (probabilities: [neg, neu, pos])
+    soft_labels = item.get("probabilities", [0.33, 0.33, 0.33])
+
     return {
         "conversations": [
             {"role": "system", "content": system_msg},
@@ -94,7 +97,8 @@ Conclusion: {"negative" if label==0 else "neutral" if label==1 else "positive"} 
             {"role": "assistant", "content": assistant_content}
         ],
         "text": item.get("text", ""),
-        "label": label
+        "label": label,
+        "soft_labels": soft_labels  # Preserve for soft label distillation
     }
 
 
